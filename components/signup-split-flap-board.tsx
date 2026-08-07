@@ -2,8 +2,24 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import confetti from "canvas-confetti";
-import { FlapDisplay } from "react-split-flap-effect";
+import { TextFlippingBoard } from "@/components/ui/text-flipping-board";
+import {
+  GATE_DISMISSED_EVENT,
+  isGateOpen,
+  isSoundEnabled,
+  preloadFlapSound,
+} from "@/lib/flap-sound";
 import { createClient } from "@/lib/supabase/client";
+
+/** How long the board sits on the count before the quote flips in. */
+const QUOTE_DELAY_MS = 12_000;
+
+/**
+ * Row layout is fixed at 8 lines so grid rows never shift when the quote
+ * appears: gap, title, gap, count, gap, footer, gap, quote. Only the count is
+ * enlarged — much past this and the glyphs outgrow their cells.
+ */
+const ROW_FONT_SCALES = [1, 1, 1, 1.5, 1, 1, 1, 1];
 
 type SignupSplitFlapBoardProps = {
   count: number;
@@ -11,17 +27,19 @@ type SignupSplitFlapBoardProps = {
 
 export function SignupSplitFlapBoard({ count }: SignupSplitFlapBoardProps) {
   const [liveCount, setLiveCount] = useState(count);
+  const [showQuote, setShowQuote] = useState(false);
+  const [ready, setReady] = useState(false);
   const confettiFrameRef = useRef<number | null>(null);
   const confettiRunningRef = useRef(false);
   const emojiRotationRef = useRef(0);
   const signupSoundRef = useRef<HTMLAudioElement | null>(null);
   const supabase = useMemo(() => createClient(), []);
 
-  const value = String(liveCount);
-  const length = Math.max(7, value.length);
+  const value = String(liveCount).padStart(7, "0");
   const title = "SIGNUPS";
   const footer = "LIVE USER COUNT";
-  const textChars = " ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  // 24 chars — sets the board width so the quote lands on a single row.
+  const quote = "STAY HUNGRY STAY FOOLISH";
   const emojiSet = ["🦞", "💃", "🍆", "🍑", "🍒"] as const;
   const launchConfetti = () => {
     if (confettiRunningRef.current) {
@@ -130,6 +148,43 @@ export function SignupSplitFlapBoard({ count }: SignupSplitFlapBoardProps) {
     setLiveCount(count);
   }, [count]);
 
+  // Hold the cascade until the sprite is decoded, otherwise the board finishes
+  // flipping long before a 2.5MB download can make a sound. Returning visitors
+  // start as soon as it loads; first-timers wait for the gate as well.
+  useEffect(() => {
+    let cancelled = false;
+
+    const start = async () => {
+      // Muted visitors have nothing to wait for — don't stall the board on a
+      // download they will never hear.
+      if (isSoundEnabled()) await preloadFlapSound();
+      if (!cancelled) setReady(true);
+    };
+
+    // The gate may have opened before this effect ran, so check state as well
+    // as subscribing — the event alone would be missed.
+    if (isGateOpen()) {
+      void start();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const onGate = () => void start();
+    window.addEventListener(GATE_DISMISSED_EVENT, onGate);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener(GATE_DISMISSED_EVENT, onGate);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    const id = setTimeout(() => setShowQuote(true), QUOTE_DELAY_MS);
+    return () => clearTimeout(id);
+  }, [ready]);
+
   useEffect(() => {
     const audio = new Audio("/signup-sound.mp3");
     audio.preload = "auto";
@@ -183,34 +238,18 @@ export function SignupSplitFlapBoard({ count }: SignupSplitFlapBoardProps) {
   }, [supabase]);
 
   return (
-    <div className="relative h-full w-full overflow-x-auto rounded-xl bg-[#0A0A0A] p-4 shadow-sm md:p-6">
-      <div className="flex h-full w-max min-w-full flex-col items-center justify-center gap-3 text-center">
-        <FlapDisplay
-          className="demoFlapper L"
-          chars={textChars}
-          length={title.length}
-          padChar=" "
-          value={title}
-        />
-        <div className="flex items-center justify-center">
-          <FlapDisplay
-            className="demoFlapper XL"
-            chars="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-            length={length}
-            padChar="0"
-            padMode="start"
-            timing={12}
-            value={value}
-          />
-        </div>
-        <FlapDisplay
-          className="demoFlapper L"
-          chars={textChars}
-          length={footer.length}
-          padChar=" "
-          value={footer}
-        />
-      </div>
+    <div className="dark relative flex h-full w-full items-center justify-center rounded-xl bg-[#0A0A0A] p-4 shadow-sm md:p-6">
+      <TextFlippingBoard
+        sound
+        rowCount={8}
+        colCount={24}
+        rowFontScales={ROW_FONT_SCALES}
+        text={
+          ready
+            ? `\n${title}\n\n${value}\n\n${footer}\n\n${showQuote ? quote : ""}`
+            : ""
+        }
+      />
     </div>
   );
 }
