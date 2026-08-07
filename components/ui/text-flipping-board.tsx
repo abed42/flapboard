@@ -38,8 +38,14 @@ const ACCENT_COLORS: AccentColor[] = [
 
 const BASE_FONT = "clamp(7px, 2.2vw, 26px)";
 
+/** Board padding (md:p-4) plus border, subtracted before fitting the grid. */
+const BOARD_PADDING = 40;
+
 /** Font size for a cell, scaled per row so one line can dominate the board. */
-function cellTextStyle(scale: number): React.CSSProperties {
+function cellTextStyle(scale: number, basePx?: number): React.CSSProperties {
+  // In fill mode the cell size is measured, so derive an exact px size instead
+  // of the viewport clamp — the clamp's upper bound would cap growth.
+  if (basePx) return { fontSize: `${basePx * scale}px`, lineHeight: 1 };
   return {
     fontSize: scale === 1 ? BASE_FONT : `calc(${BASE_FONT} * ${scale})`,
     lineHeight: 1,
@@ -55,6 +61,7 @@ const FlapCell = React.memo(function FlapCell({
   flipDuration,
   sound,
   fontScale,
+  fontPx,
 }: {
   target: string;
   delay: number;
@@ -62,6 +69,7 @@ const FlapCell = React.memo(function FlapCell({
   flipDuration: number;
   sound: boolean;
   fontScale: number;
+  fontPx?: number;
 }) {
   const [current, setCurrent] = useState(" ");
   const [prev, setPrev] = useState(" ");
@@ -146,7 +154,7 @@ const FlapCell = React.memo(function FlapCell({
   const flapTopBg = prevAccent?.top ?? "bg-neutral-100 dark:bg-neutral-800";
   const flapTextColor = prevAccent?.text ?? "text-neutral-800 dark:text-white";
 
-  const textStyle = cellTextStyle(fontScale);
+  const textStyle = cellTextStyle(fontScale, fontPx);
 
   const bottomDelay = flipDuration * 0.5;
 
@@ -278,7 +286,8 @@ const FlapCell = React.memo(function FlapCell({
   prevProps.stepMs === nextProps.stepMs &&
   prevProps.flipDuration === nextProps.flipDuration &&
   prevProps.sound === nextProps.sound &&
-  prevProps.fontScale === nextProps.fontScale,
+  prevProps.fontScale === nextProps.fontScale &&
+  prevProps.fontPx === nextProps.fontPx,
 );
 
 // ── Color Tile ────────────────────────────────────────────────────────
@@ -381,6 +390,8 @@ export interface TextFlippingBoardProps {
   colCount?: number;
   /** Per-row font multipliers, indexed by grid row. Missing entries use 1. */
   rowFontScales?: number[];
+  /** Scale the board to fill its parent, preserving the grid's aspect ratio. */
+  fill?: boolean;
 }
 
 export function TextFlippingBoard({
@@ -392,10 +403,41 @@ export function TextFlippingBoard({
   rowCount = BOARD_ROWS,
   colCount = BOARD_COLS,
   rowFontScales,
+  fill = false,
 }: TextFlippingBoardProps) {
   useEffect(() => {
     if (sound) void preloadFlapSound();
   }, [sound]);
+
+  // The grid has a fixed aspect ratio (colCount wide by rowCount cells that are
+  // each twice as tall as they are wide), so fitting it to a box needs both
+  // dimensions at once. CSS aspect-ratio can't express that — clamping one axis
+  // leaves the other stale — so measure the parent and size the grid directly.
+  const fitRef = useRef<HTMLDivElement>(null);
+  const [gridWidth, setGridWidth] = useState<number | null>(null);
+
+  useEffect(() => {
+    const el = fitRef.current;
+    if (!fill || !el) return;
+
+    const aspect = colCount / (rowCount * 2);
+
+    const measure = () => {
+      const available = Math.min(
+        el.clientWidth - BOARD_PADDING,
+        (el.clientHeight - BOARD_PADDING) * aspect,
+      );
+      if (available > 0) setGridWidth(Math.floor(available));
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fill, colCount, rowCount]);
+
+  // 0.8 keeps a monospace glyph clear of its cell walls at scale 1.
+  const fontPx = gridWidth ? (gridWidth / colCount) * 0.8 : undefined;
 
   const scale = duration / BASE_TOTAL_S;
   const colDelay = BASE_COL_DELAY * scale;
@@ -443,16 +485,20 @@ export function TextFlippingBoard({
     return grid;
   }, [rows, text, rowCount, colCount]);
 
-  return (
+  const boardEl = (
     <div
       className={cn(
-        "relative mx-auto w-full max-w-3xl rounded-xl bg-neutral-100 p-2 shadow-xl md:rounded-2xl md:p-4 dark:bg-neutral-900 dark:shadow-[0_20px_70px_-15px_rgba(0,0,0,0.6)]",
+        "relative rounded-xl bg-neutral-100 p-2 shadow-xl md:rounded-2xl md:p-4 dark:bg-neutral-900 dark:shadow-[0_20px_70px_-15px_rgba(0,0,0,0.6)]",
+        fill ? "shrink-0" : "mx-auto w-full max-w-3xl",
         className,
       )}
     >
       <div
         className="grid gap-px md:gap-[3px]"
-        style={{ gridTemplateColumns: `repeat(${colCount}, 1fr)` }}
+        style={{
+          gridTemplateColumns: `repeat(${colCount}, 1fr)`,
+          width: gridWidth ?? undefined,
+        }}
       >
         {board.map((row, r) =>
           row.map((cell, c) =>
@@ -467,11 +513,23 @@ export function TextFlippingBoard({
                 flipDuration={flipDur}
                 sound={sound}
                 fontScale={rowFontScales?.[r] ?? 1}
+                fontPx={fontPx}
               />
             ),
           ),
         )}
       </div>
+    </div>
+  );
+
+  if (!fill) return boardEl;
+
+  return (
+    <div
+      ref={fitRef}
+      className="flex h-full w-full items-center justify-center overflow-hidden"
+    >
+      {gridWidth ? boardEl : null}
     </div>
   );
 }

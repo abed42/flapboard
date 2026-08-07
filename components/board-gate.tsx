@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { CornerDownLeft } from "lucide-react";
 import {
-  hasSoundPreference,
   isSoundEnabled,
   openGate,
   setSoundPreference,
@@ -33,18 +33,10 @@ export function BoardGate() {
     let cancelled = false;
 
     const decide = async () => {
-      // Never asked, or explicitly muted: nothing to unlock, so don't block.
-      if (!hasSoundPreference()) {
-        if (!cancelled) setPhase("prompt");
-        return;
-      }
-      if (!isSoundEnabled()) {
-        if (!cancelled) setPhase("open");
-        openGate();
-        return;
-      }
-
-      const unlocked = await tryAutoUnlock();
+      // Skip the gate only when audio genuinely autostarts. Muting is not a
+      // reason to skip — the gate is also the intro that lets the cascade be
+      // seen, so entering without sound should still go through it next time.
+      const unlocked = isSoundEnabled() && (await tryAutoUnlock());
       if (cancelled) return;
 
       if (unlocked) {
@@ -90,6 +82,14 @@ export function BoardGate() {
     <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-8 bg-[#0A0A0A]">
       {phase === "prompt" && (
         <>
+          <Image
+            src="/gameplug-logo.svg"
+            alt="Gamerplug"
+            width={240}
+            height={240}
+            priority
+            className="mb-16 h-auto w-56"
+          />
           <button
             type="button"
             onClick={() => enter(true)}

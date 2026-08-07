@@ -14,8 +14,6 @@
 
 const SOUND_URL = "/sounds/sound.ogg";
 const SOUND_MUTED_KEY = "signup_sound_muted";
-/** Whether this browser has been asked about sound yet (answer lives in SOUND_MUTED_KEY). */
-const SOUND_PROMPTED_KEY = "flap_sound_prompted";
 
 /** [startMs, durationMs] slices lifted from the keyboard component's sprite map. */
 const SPRITES: ReadonlyArray<readonly [number, number]> = [
@@ -113,18 +111,12 @@ export function isSoundEnabled() {
   return !isMuted();
 }
 
-/** True once the visitor has answered the sound prompt in this browser. */
-export function hasSoundPreference() {
-  return read(SOUND_PROMPTED_KEY) === "true";
-}
-
 /**
  * Record the visitor's answer. Must be called from inside a real user gesture
  * when enabling, so the AudioContext can actually be resumed — browsers ignore
  * resume() outside one.
  */
 export function setSoundPreference(enabled: boolean) {
-  write(SOUND_PROMPTED_KEY, "true");
   write(SOUND_MUTED_KEY, String(!enabled));
   if (!enabled) return;
 

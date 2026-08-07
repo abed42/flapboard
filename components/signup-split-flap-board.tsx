@@ -38,7 +38,8 @@ export function SignupSplitFlapBoard({ count }: SignupSplitFlapBoardProps) {
   const value = String(liveCount).padStart(7, "0");
   const title = "SIGNUPS";
   const footer = "LIVE USER COUNT";
-  // 24 chars — sets the board width so the quote lands on a single row.
+  // 24 chars — the longest line, and what the 26-col board is sized around
+  // so it lands on one row with a blank column either side.
   const quote = "STAY HUNGRY STAY FOOLISH";
   const emojiSet = ["🦞", "💃", "🍆", "🍑", "🍒"] as const;
   const launchConfetti = () => {
@@ -240,9 +241,10 @@ export function SignupSplitFlapBoard({ count }: SignupSplitFlapBoardProps) {
   return (
     <div className="dark relative flex h-full w-full items-center justify-center rounded-xl bg-[#0A0A0A] p-4 shadow-sm md:p-6">
       <TextFlippingBoard
+        fill
         sound
         rowCount={8}
-        colCount={24}
+        colCount={26}
         rowFontScales={ROW_FONT_SCALES}
         text={
           ready
