@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { ThemeProvider } from "next-themes";
+import { BoardGate } from "@/components/board-gate";
 import { FullscreenToggle } from "@/components/fullscreen-toggle";
 import { SoundToggle } from "@/components/sound-toggle";
-import "react-split-flap-effect/extras/themes.css";
 import "./globals.css";
 
 const defaultUrl = process.env.VERCEL_URL
@@ -37,6 +37,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
+          <BoardGate />
           <SoundToggle />
           <FullscreenToggle />
         </ThemeProvider>
