@@ -41,7 +41,7 @@ export function SignupSplitFlapBoard({ count }: SignupSplitFlapBoardProps) {
   // 24 chars — the longest line, and what the 26-col board is sized around
   // so it lands on one row with a blank column either side.
   const quote = "STAY HUNGRY STAY FOOLISH";
-  const emojiSet = ["🦞", "💃", "🍆", "🍑", "🍒"] as const;
+  const emojiSet = ["🎉", "🚀", "✨", "💜", "🔥"] as const;
   const launchConfetti = () => {
     if (confettiRunningRef.current) {
       return;

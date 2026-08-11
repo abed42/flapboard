@@ -83,12 +83,12 @@ export function BoardGate() {
       {phase === "prompt" && (
         <>
           <Image
-            src="/gameplug-logo.svg"
-            alt="Gamerplug"
+            src="/flapboard-logo.svg"
+            alt="Flapboard"
             width={240}
             height={240}
             priority
-            className="mb-16 h-auto w-56"
+            className="mb-16 h-auto w-40"
           />
           <button
             type="button"

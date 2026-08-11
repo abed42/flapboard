@@ -1,109 +1,168 @@
-<a href="https://demo-nextjs-with-supabase.vercel.app/">
-  <img alt="Next.js and Supabase Starter Kit - the fastest way to build apps with Next.js and Supabase" src="https://demo-nextjs-with-supabase.vercel.app/opengraph-image.png">
-  <h1 align="center">Next.js and Supabase Starter Kit</h1>
-</a>
+<p align="center">
+  <img src="public/flapboard-logo.svg" alt="Flapboard" width="120" height="120">
+</p>
+
+<h1 align="center">Flapboard</h1>
 
 <p align="center">
- The fastest way to build apps with Next.js and Supabase
+  A live split-flap signup board for your product — the kind you'd mount on the office wall.
 </p>
 
 <p align="center">
-  <a href="#features"><strong>Features</strong></a> ·
-  <a href="#demo"><strong>Demo</strong></a> ·
-  <a href="#deploy-to-vercel"><strong>Deploy to Vercel</strong></a> ·
-  <a href="#clone-and-run-locally"><strong>Clone and run locally</strong></a> ·
-  <a href="#feedback-and-issues"><strong>Feedback and issues</strong></a>
-  <a href="#more-supabase-examples"><strong>More Examples</strong></a>
+  <a href="#what-it-does"><strong>What it does</strong></a> ·
+  <a href="#quick-start"><strong>Quick start</strong></a> ·
+  <a href="#how-it-works"><strong>How it works</strong></a> ·
+  <a href="#deploy-to-vercel"><strong>Deploy</strong></a> ·
+  <a href="#kiosk-mode"><strong>Kiosk mode</strong></a> ·
+  <a href="#customization"><strong>Customization</strong></a>
 </p>
+
 <br/>
 
-## Features
+## What it does
 
-- Works across the entire [Next.js](https://nextjs.org) stack
-  - App Router
-  - Pages Router
-  - Proxy
-  - Client
-  - Server
-  - It just works!
-- supabase-ssr. A package to configure Supabase Auth to use cookies
-- Password-based authentication block installed via the [Supabase UI Library](https://supabase.com/ui/docs/nextjs/password-based-auth)
-- Styling with [Tailwind CSS](https://tailwindcss.com)
-- Components with [shadcn/ui](https://ui.shadcn.com/)
-- Optional deployment with [Supabase Vercel Integration and Vercel deploy](#deploy-your-own)
-  - Environment variables automatically assigned to Vercel project
+Flapboard renders your live user count on an animated split-flap display —
+the mechanical departure boards from old train stations — complete with the
+clattering flip sound. Every time someone signs up:
 
-## Demo
+- the count flips up in real time (no refresh, no polling),
+- confetti and emoji cannons fire,
+- a celebration sound plays.
 
-You can view a fully working demo at [demo-nextjs-with-supabase.vercel.app](https://demo-nextjs-with-supabase.vercel.app/).
+Leave it fullscreen on a TV in the office and watch signups roll in.
+
+**Built with:** [Next.js](https://nextjs.org) (App Router) ·
+[Supabase](https://supabase.com) (auth, database, realtime) ·
+[Tailwind CSS](https://tailwindcss.com) · [shadcn/ui](https://ui.shadcn.com) ·
+[Motion](https://motion.dev) · [canvas-confetti](https://github.com/catdad/canvas-confetti)
+
+It also ships with Supabase's complete password-based auth flow
+(sign-up, login, forgot/update password, protected pages), so the signups it
+counts can come from this very app — or from any other app pointed at the same
+Supabase project.
+
+## Quick start
+
+### 1. Get the code
+
+This repo is a template — click **Use this template** on GitHub (or fork it),
+then clone your copy:
+
+```bash
+git clone https://github.com/YOUR_USERNAME/YOUR_REPO.git
+cd YOUR_REPO
+pnpm install   # or npm install / yarn
+```
+
+### 2. Create a Supabase project
+
+Create a free project at [database.new](https://database.new) (skip this if
+you already have one — Flapboard can point at an existing project and count
+its existing users).
+
+### 3. Set up the database
+
+Open your project's **SQL Editor** in the Supabase dashboard, paste the
+contents of [`supabase/setup.sql`](supabase/setup.sql), and run it. It creates:
+
+- a `signup_events` table whose inserts drive the realtime updates,
+- a `get_signup_count()` function the board calls for the total,
+- a trigger that records an event whenever a user signs up.
+
+### 4. Configure environment variables
+
+```bash
+cp .env.example .env.local
+```
+
+Fill in both values from **Project Settings → API keys** in your Supabase
+dashboard:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your-project-url
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-or-anon-key
+```
+
+> [!NOTE]
+> `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` refers to Supabase's new
+> **publishable** key format, but legacy **anon** keys work in this variable
+> too — paste whichever your dashboard shows.
+
+### 5. Run it
+
+```bash
+pnpm dev
+```
+
+Open [localhost:3000](http://localhost:3000), click **ENTER** at the gate
+(the click unlocks browser audio), and the board cascades in with your live
+count. Sign up a test user at `/auth/sign-up` to watch it flip.
+
+## How it works
+
+```
+new user signs up (any app on this Supabase project)
+        │
+        ▼
+auth.users INSERT ──trigger──▶ public.signup_events INSERT
+                                       │
+                                       ▼  Supabase Realtime
+                          board hears the INSERT, calls
+                          get_signup_count() ──▶ count flips up,
+                          confetti + sound fire
+```
+
+- The board server-renders the initial count via the `get_signup_count()` RPC
+  (a `SECURITY DEFINER` function, so the client key never reads `auth.users`
+  directly — only a single number crosses the wire).
+- The client subscribes to `INSERT` events on `signup_events` over Supabase
+  Realtime and re-fetches the count when one arrives. The events table is
+  deliberately content-free (just an id and timestamp), so nothing sensitive
+  is ever broadcast.
+- Because the trigger sits on `auth.users`, **any** app using the same
+  Supabase project feeds the board — your real product's signups count, not
+  just this app's.
 
 ## Deploy to Vercel
 
-Vercel deployment will guide you through creating a Supabase account and project.
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fabed42%2Fflapboard&project-name=flapboard&repository-name=flapboard)
 
-After installation of the Supabase integration, all relevant environment variables will be assigned to the project so the deployment is fully functioning.
+Or push your copy to GitHub and import it at
+[vercel.com/new](https://vercel.com/new). Set the two environment variables
+from step 4 in the Vercel project settings — that's the entire configuration.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&project-name=nextjs-with-supabase&repository-name=nextjs-with-supabase&demo-title=nextjs-with-supabase&demo-description=This+starter+configures+Supabase+Auth+to+use+cookies%2C+making+the+user%27s+session+available+throughout+the+entire+Next.js+app+-+Client+Components%2C+Server+Components%2C+Route+Handlers%2C+Server+Actions+and+Middleware.&demo-url=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2F&external-id=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&demo-image=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2Fopengraph-image.png)
+## Kiosk mode
 
-The above will also clone the Starter kit to your GitHub, you can clone that locally and develop locally.
+Flapboard is built to run unattended on a wall-mounted display:
 
-If you wish to just develop locally and not deploy to Vercel, [follow the steps below](#clone-and-run-locally).
+- The **fullscreen toggle** (bottom corner) takes the board fullscreen; the
+  **sound toggle** mutes/unmutes without reloading.
+- Browsers block audio until a user gesture, which is what the ENTER gate is
+  for. On a dedicated kiosk, launch Chrome with
+  `--autoplay-policy=no-user-gesture-required` and the gate skips itself —
+  the board starts on its own after every reboot.
+- Chrome also learns to allow autoplay on sites you use often (Media
+  Engagement), so the gate tends to disappear naturally on a machine that
+  shows the board daily.
 
-## Clone and run locally
+## Customization
 
-1. You'll first need a Supabase project which can be made [via the Supabase dashboard](https://database.new)
+| What | Where |
+| --- | --- |
+| Board title, footer, quote | `components/signup-split-flap-board.tsx` — `title`, `footer`, `quote` consts |
+| Delay before the quote flips in | `QUOTE_DELAY_MS` in the same file |
+| Confetti emoji | `emojiSet` in the same file |
+| Signup celebration sound | replace `public/signup-sound.mp3` |
+| Flap click sound sprite | `public/sounds/sound.ogg`, sliced in `lib/flap-sound.ts` |
+| Logo | replace `public/flapboard-logo.svg` (used in the nav and the ENTER gate) |
+| Board dimensions | `rowCount` / `colCount` props on `TextFlippingBoard` |
+| Site title & description | `app/layout.tsx` metadata |
+| Favicon & social images | `app/favicon.ico`, `app/opengraph-image.png`, `app/twitter-image.png` |
 
-2. Create a Next.js app using the Supabase Starter template npx command
+The split-flap component itself lives in
+`components/ui/text-flipping-board.tsx` and is self-contained — feel free to
+lift it into other projects.
 
-   ```bash
-   npx create-next-app --example with-supabase with-supabase-app
-   ```
+## License
 
-   ```bash
-   yarn create next-app --example with-supabase with-supabase-app
-   ```
-
-   ```bash
-   pnpm create next-app --example with-supabase with-supabase-app
-   ```
-
-3. Use `cd` to change into the app's directory
-
-   ```bash
-   cd with-supabase-app
-   ```
-
-4. Rename `.env.example` to `.env.local` and update the following:
-
-  ```env
-  NEXT_PUBLIC_SUPABASE_URL=[INSERT SUPABASE PROJECT URL]
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=[INSERT SUPABASE PROJECT API PUBLISHABLE OR ANON KEY]
-  ```
-  > [!NOTE]
-  > This example uses `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, which refers to Supabase's new **publishable** key format.
-  > Both legacy **anon** keys and new **publishable** keys can be used with this variable name during the transition period. Supabase's dashboard may show `NEXT_PUBLIC_SUPABASE_ANON_KEY`; its value can be used in this example.
-  > See the [full announcement](https://github.com/orgs/supabase/discussions/29260) for more information.
-
-  Both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` can be found in [your Supabase project's API settings](https://supabase.com/dashboard/project/_?showConnect=true)
-
-5. You can now run the Next.js local development server:
-
-   ```bash
-   npm run dev
-   ```
-
-   The starter kit should now be running on [localhost:3000](http://localhost:3000/).
-
-6. This template comes with the default shadcn/ui style initialized. If you instead want other ui.shadcn styles, delete `components.json` and [re-install shadcn/ui](https://ui.shadcn.com/docs/installation/next)
-
-> Check out [the docs for Local Development](https://supabase.com/docs/guides/getting-started/local-development) to also run Supabase locally.
-
-## Feedback and issues
-
-Please file feedback and issues over on the [Supabase GitHub org](https://github.com/supabase/supabase/issues/new/choose).
-
-## More Supabase examples
-
-- [Next.js Subscription Payments Starter](https://github.com/vercel/nextjs-subscription-payments)
-- [Cookie-based Auth and the Next.js 13 App Router (free course)](https://youtube.com/playlist?list=PL5S4mPUpp4OtMhpnp93EFSo42iQ40XjbF)
-- [Supabase Auth and the Next.js App Router](https://github.com/supabase/supabase/tree/master/examples/auth/nextjs)
+[MIT](LICENSE) — use it, fork it, mount it on your wall.
